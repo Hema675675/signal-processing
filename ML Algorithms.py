@@ -1,80 +1,73 @@
-import ssl
-ssl._create_default_https_context = ssl._create_unverified_context
-
-# Import necessary libraries
+import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.svm import SVC
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, recall_score, f1_score
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix, accuracy_score
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.preprocessing import StandardScaler
 
 # Load the dataset
-url = "https://archive.ics.uci.edu/ml/machine-learning-databases/iris/iris.data"
-columns = ['sepal_length', 'sepal_width', 'petal_length', 'petal_width', 'class']
-data = pd.read_csv(url, names=columns)
+data_path = "/Users/wolfmigo/Downloads/wine/wine.csv"
+columns = ['Class', 'Alcohol', 'Malic acid', 'Ash', 'Alcalinity of ash', 'Magnesium',
+           'Total phenols', 'Flavanoids', 'Nonflavanoid phenols', 'Proanthocyanins',
+           'Color intensity', 'Hue', 'OD280/OD315 of diluted wines', 'Proline']
 
-# Preprocess the dataset
-X = data.drop('class', axis=1)
-y = data['class']
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+wine_data = pd.read_csv(data_path, names=columns)
 
-# Standardize the features
+# Split features and labels
+X = wine_data.drop('Class', axis=1)
+y = wine_data['Class']
+
+# Split data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Scale the data
 scaler = StandardScaler()
-X_train = scaler.fit_transform(X_train)
-X_test = scaler.transform(X_test)
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
 
-# Define classifiers
+# Initialize classifiers
 classifiers = {
-    'Logistic Regression': LogisticRegression(),
-    'Decision Tree': DecisionTreeClassifier(),
     'Random Forest': RandomForestClassifier(),
-    'SVM': SVC(),
-    'KNN': KNeighborsClassifier()
+    'Support Vector Machine': SVC(),
+    'K-Nearest Neighbors': KNeighborsClassifier(),
+    'Decision Tree': DecisionTreeClassifier(),
+    'Gradient Boosting': GradientBoostingClassifier()
 }
 
-# Train and evaluate each classifier
-results = {}
-for name, clf in classifiers.items():
-    clf.fit(X_train, y_train)
-    y_pred = clf.predict(X_test)
-    cm = confusion_matrix(y_test, y_pred)
-    acc = accuracy_score(y_test, y_pred)
-    prec = precision_score(y_test, y_pred, average='weighted')
-    rec = recall_score(y_test, y_pred, average='weighted')
-    f1 = f1_score(y_test, y_pred, average='weighted')
-
-    results[name] = {
-        'Confusion Matrix': cm,
-        'Accuracy': acc,
-        'Precision': prec,
-        'Recall': rec,
-        'F1 Score': f1
-    }
-
-# Print results
-for name, metrics in results.items():
-    print(f"{name}:")
-    print(f"Confusion Matrix:\n{metrics['Confusion Matrix']}")
-    print(f"Accuracy: {metrics['Accuracy']:.2f}")
-    print(f"Precision: {metrics['Precision']:.2f}")
-    print(f"Recall: {metrics['Recall']:.2f}")
-    print(f"F1 Score: {metrics['F1 Score']:.2f}\n")
+# Train classifiers and obtain confusion matrices
+confusion_matrices = {}
+accuracies = {}
+for clf_name, clf in classifiers.items():
+    if clf_name == 'Gradient Boosting':
+        clf.fit(X_train_scaled, y_train)
+        y_pred = clf.predict(X_test_scaled)
+    else:
+        clf.fit(X_train, y_train)
+        y_pred = clf.predict(X_test)
+    confusion_matrices[clf_name] = confusion_matrix(y_test, y_pred)
+    accuracies[clf_name] = accuracy_score(y_test, y_pred)
 
 # Plot confusion matrices
-fig, axes = plt.subplots(3, 2, figsize=(15, 10))
-axes = axes.flatten()
-
-for ax, (name, metrics) in zip(axes, results.items()):
-    sns.heatmap(metrics['Confusion Matrix'], annot=True, fmt='d', ax=ax, cmap='Blues')
-    ax.set_title(name)
-    ax.set_xlabel('Predicted')
-    ax.set_ylabel('Actual')
-
+plt.figure(figsize=(15, 10))
+for i, (clf_name, matrix) in enumerate(confusion_matrices.items(), 1):
+    plt.subplot(2, 3, i)
+    sns.heatmap(matrix, annot=True, fmt="d", cmap="Greens", cbar=True)  # Set cbar=True for color bar
+    plt.title(f"Confusion Matrix for {clf_name}")
+    plt.xlabel("Predicted label")
+    plt.ylabel("True label")
 plt.tight_layout()
 plt.show()
+
+# Print accuracies
+print("Accuracies:")
+for clf_name, acc in accuracies.items():
+    print(f"{clf_name}: {acc}")
+
+# Compare performances
+best_classifier = max(accuracies, key=accuracies.get)
+print(f"\nBest performing classifier: {best_classifier} with accuracy of {accuracies[best_classifier]}")
